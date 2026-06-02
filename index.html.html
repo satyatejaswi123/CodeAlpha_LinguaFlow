@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinguaFlow — AI Language Translation</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --border: #2a2a3d;
+    --accent: #7c6af7;
+    --accent2: #f7c56a;
+    --accent3: #6af7c5;
+    --text: #e8e8f0;
+    --muted: #7070a0;
+    --danger: #f76a6a;
+    --transition-theme: background 0.35s ease, color 0.35s ease, border-color 0.35s ease;
+  }
+
+  body.light {
+    --bg: #f4f3ff;
+    --surface: #ffffff;
+    --surface2: #eeecff;
+    --border: #d4d0f5;
+    --accent: #6355e8;
+    --accent2: #e0960a;
+    --accent3: #0aaa7a;
+    --text: #1a1830;
+    --muted: #8880b0;
+    --danger: #d94040;
+  }
+
+  body, .card, select, textarea, .btn, .tts-btn, .swap-btn, .history-item, .lang-badge, .status-bar {
+    transition: var(--transition-theme), box-shadow 0.2s;
+  }
+
+  /* Theme toggle button */
+  .theme-toggle {
+    position: fixed;
+    top: 20px;
+    right: 24px;
+    z-index: 100;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    padding: 8px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    transition: var(--transition-theme), transform 0.2s;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+  .theme-toggle .icon { font-size: 1rem; transition: transform 0.5s ease; }
+  body.light .theme-toggle .icon { transform: rotate(180deg); }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,247,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,247,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Glowing orbs */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.18;
+    pointer-events: none;
+    animation: drift 12s ease-in-out infinite;
+  }
+  .orb1 { width: 400px; height: 400px; background: var(--accent); top: -100px; left: -100px; }
+  .orb2 { width: 350px; height: 350px; background: var(--accent2); bottom: -80px; right: -80px; animation-delay: -6s; }
+  .orb3 { width: 250px; height: 250px; background: var(--accent3); top: 50%; left: 50%; animation-delay: -3s; }
+
+  @keyframes drift {
+    0%, 100% { transform: translate(0, 0); }
+    33% { transform: translate(30px, -20px); }
+    66% { transform: translate(-20px, 30px); }
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+    animation: fadeDown 0.7s ease both;
+  }
+
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .logo-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .logo-icon {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--accent), var(--accent3));
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2rem, 5vw, 3rem);
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 50%, var(--accent3) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .tagline {
+    color: var(--muted);
+    font-size: 0.95rem;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.05em;
+    margin-top: 6px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 28px;
+    animation: fadeUp 0.7s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Language selector row */
+  .lang-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 24px;
+    animation: fadeUp 0.7s 0.1s ease both;
+  }
+
+  .lang-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .lang-label {
+    font-size: 0.7rem;
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+  }
+
+  select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.92rem;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%237070a0' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+  }
+
+  select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,106,247,0.15); }
+
+  .swap-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+    align-self: flex-end;
+    margin-bottom: 0;
+    flex-shrink: 0;
+  }
+
+  .swap-btn:hover {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    transform: rotate(180deg);
+  }
+
+  /* Text areas */
+  .text-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    animation: fadeUp 0.7s 0.2s ease both;
+  }
+
+  .textarea-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .textarea-label {
+    font-size: 0.7rem;
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+  }
+
+  .textarea-box {
+    position: relative;
+    flex: 1;
+  }
+
+  textarea {
+    width: 100%;
+    height: 220px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    line-height: 1.6;
+    padding: 16px;
+    border-radius: 12px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,106,247,0.12); }
+  textarea::placeholder { color: var(--muted); }
+  textarea:read-only { cursor: default; }
+  textarea:read-only:focus { border-color: var(--border); box-shadow: none; }
+
+  .char-count {
+    position: absolute;
+    bottom: 10px;
+    right: 12px;
+    font-size: 0.7rem;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  /* Output area shimmer */
+  .output-area {
+    position: relative;
+  }
+
+  .output-area.loading textarea {
+    background: linear-gradient(90deg, var(--surface2) 25%, #1f1f2e 50%, var(--surface2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Action buttons row */
+  .actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+    animation: fadeUp 0.7s 0.3s ease both;
+  }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 28px;
+    border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.92rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #9c8af7);
+    color: white;
+    box-shadow: 0 4px 20px rgba(124,106,247,0.35);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(124,106,247,0.5);
+  }
+
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .btn-ghost {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Status bar */
+  .status-bar {
+    margin-top: 20px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .status-bar.show { display: flex; }
+  .status-bar.success { background: rgba(106, 247, 197, 0.1); border: 1px solid rgba(106,247,197,0.25); color: var(--accent3); }
+  .status-bar.error { background: rgba(247, 106, 106, 0.1); border: 1px solid rgba(247,106,106,0.25); color: var(--danger); }
+  .status-bar.info { background: rgba(124, 106, 247, 0.1); border: 1px solid rgba(124,106,247,0.25); color: var(--accent); }
+
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(124,106,247,0.3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* TTS controls */
+  .tts-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .tts-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-family: 'DM Mono', monospace;
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .tts-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .tts-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* History */
+  .history-section {
+    margin-top: 32px;
+    animation: fadeUp 0.7s 0.4s ease both;
+  }
+
+  .history-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+
+  .history-list::-webkit-scrollbar { width: 4px; }
+  .history-list::-webkit-scrollbar-track { background: transparent; }
+  .history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .history-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: auto 1fr auto 1fr;
+    gap: 8px 10px;
+    align-items: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .history-item:hover { border-color: var(--accent); }
+
+  .lang-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .history-text {
+    font-size: 0.85rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .arrow-icon { color: var(--muted); font-size: 0.8rem; }
+
+  footer {
+    text-align: center;
+    margin-top: 40px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    animation: fadeUp 0.7s 0.5s ease both;
+  }
+
+  footer span { color: var(--accent); }
+
+  @media (max-width: 620px) {
+    .text-row { grid-template-columns: 1fr; }
+    .lang-row { grid-template-columns: 1fr auto 1fr; }
+    textarea { height: 150px; }
+    .theme-toggle { top: 12px; right: 12px; font-size: 0.72rem; padding: 6px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">
+  <span class="icon" id="themeIcon">🌙</span>
+  <span id="themeLabel">/☀ Theme</span>
+</button>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+<div class="orb orb3"></div>
+
+<div class="container">
+
+  <header>
+    <div class="logo-row">
+      <div class="logo-icon">🌐</div>
+      <h1>LinguaFlow</h1>
+    </div>
+    <p class="tagline">// AI-Powered Language Translation · CodeAlpha Task 1</p>
+  </header>
+
+  <div class="card">
+    <!-- Language Selector -->
+    <div class="lang-row">
+      <div class="lang-group">
+        <span class="lang-label">Source Language</span>
+        <select id="sourceLang"></select>
+      </div>
+
+      <button class="swap-btn" onclick="swapLanguages()" title="Swap Languages">⇄</button>
+
+      <div class="lang-group">
+        <span class="lang-label">Target Language</span>
+        <select id="targetLang"></select>
+      </div>
+    </div>
+
+    <!-- Text Areas -->
+    <div class="text-row">
+      <div class="textarea-wrap">
+        <span class="textarea-label">Input Text</span>
+        <div class="textarea-box">
+          <textarea id="inputText" placeholder="Type or paste your text here…" oninput="updateCharCount()"></textarea>
+          <span class="char-count" id="charCount">0 / 5000</span>
+        </div>
+        <div class="tts-row">
+          <button class="tts-btn" onclick="speakText('input')" id="ttsInputBtn">🔊 Listen</button>
+          <button class="tts-btn" onclick="clearInput()">✕ Clear</button>
+        </div>
+      </div>
+
+      <div class="textarea-wrap">
+        <span class="textarea-label">Translation</span>
+        <div class="textarea-box output-area" id="outputArea">
+          <textarea id="outputText" placeholder="Translation will appear here…" readonly></textarea>
+        </div>
+        <div class="tts-row">
+          <button class="tts-btn" onclick="speakText('output')" id="ttsOutputBtn" disabled>🔊 Listen</button>
+          <button class="tts-btn" onclick="copyOutput()" id="copyBtn" disabled>📋 Copy</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="status-bar" id="statusBar">
+      <div class="spinner" id="spinner" style="display:none"></div>
+      <span id="statusText"></span>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn btn-primary" id="translateBtn" onclick="doTranslate()">
+        ✦ Translate
+      </button>
+      <button class="btn btn-ghost" onclick="detectLanguage()" id="detectBtn">
+        🔍 Detect Language
+      </button>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="history-section" id="historySection" style="display:none">
+    <p class="history-title">// Recent Translations</p>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+  <footer>Built with ♥ for <span>CodeAlpha AI Internship</span> · Using MyMemory Free API</footer>
+
+</div>
+
+<script>
+// ── Language list ────────────────────────────────────────────────────────────
+const LANGUAGES = [
+  { code: 'auto', name: 'Auto Detect' },
+  { code: 'en', name: 'English' },
+  { code: 'hi', name: 'Hindi' },
+  { code: 'te', name: 'Telugu' },
+  { code: 'ta', name: 'Tamil' },
+  { code: 'kn', name: 'Kannada' },
+  { code: 'ml', name: 'Malayalam' },
+  { code: 'mr', name: 'Marathi' },
+  { code: 'gu', name: 'Gujarati' },
+  { code: 'bn', name: 'Bengali' },
+  { code: 'ur', name: 'Urdu' },
+  { code: 'pa', name: 'Punjabi' },
+  { code: 'fr', name: 'French' },
+  { code: 'de', name: 'German' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'it', name: 'Italian' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'zh', name: 'Chinese (Simplified)' },
+  { code: 'zh-TW', name: 'Chinese (Traditional)' },
+  { code: 'ko', name: 'Korean' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'tr', name: 'Turkish' },
+  { code: 'nl', name: 'Dutch' },
+  { code: 'pl', name: 'Polish' },
+  { code: 'sv', name: 'Swedish' },
+  { code: 'id', name: 'Indonesian' },
+  { code: 'vi', name: 'Vietnamese' },
+  { code: 'th', name: 'Thai' },
+  { code: 'fa', name: 'Persian' },
+  { code: 'he', name: 'Hebrew' },
+];
+
+const sourceLangEl = document.getElementById('sourceLang');
+const targetLangEl = document.getElementById('targetLang');
+
+LANGUAGES.forEach(lang => {
+  const opt1 = new Option(lang.name, lang.code);
+  const opt2 = new Option(lang.name, lang.code);
+  sourceLangEl.add(opt1);
+  if (lang.code !== 'auto') targetLangEl.add(opt2);
+});
+
+// Default: Auto → Telugu (home language)
+sourceLangEl.value = 'auto';
+targetLangEl.value = 'te';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function showStatus(msg, type = 'info', loading = false) {
+  const bar = document.getElementById('statusBar');
+  const text = document.getElementById('statusText');
+  const spinner = document.getElementById('spinner');
+  bar.className = `status-bar show ${type}`;
+  text.textContent = msg;
+  spinner.style.display = loading ? 'block' : 'none';
+}
+
+function hideStatus() {
+  document.getElementById('statusBar').className = 'status-bar';
+}
+
+function updateCharCount() {
+  const len = document.getElementById('inputText').value.length;
+  document.getElementById('charCount').textContent = `${len} / 5000`;
+}
+
+function clearInput() {
+  document.getElementById('inputText').value = '';
+  document.getElementById('outputText').value = '';
+  updateCharCount();
+  document.getElementById('copyBtn').disabled = true;
+  document.getElementById('ttsOutputBtn').disabled = true;
+  hideStatus();
+}
+
+function copyOutput() {
+  const text = document.getElementById('outputText').value;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    showStatus('Copied to clipboard!', 'success');
+    setTimeout(hideStatus, 2000);
+  });
+}
+
+function swapLanguages() {
+  const src = sourceLangEl.value;
+  const tgt = targetLangEl.value;
+  if (src === 'auto') return;
+  // Check if src exists in targetLang options
+  if ([...targetLangEl.options].some(o => o.value === src)) {
+    sourceLangEl.value = tgt;
+    targetLangEl.value = src;
+    // Also swap text
+    const inputText = document.getElementById('inputText').value;
+    const outputText = document.getElementById('outputText').value;
+    document.getElementById('inputText').value = outputText;
+    document.getElementById('outputText').value = inputText;
+    updateCharCount();
+  }
+}
+
+// ── Translation API (MyMemory — free, no key needed) ─────────────────────────
+async function doTranslate() {
+  const text = document.getElementById('inputText').value.trim();
+  if (!text) { showStatus('Please enter some text to translate.', 'error'); return; }
+  if (text.length > 5000) { showStatus('Text exceeds 5000 character limit.', 'error'); return; }
+
+  const src = sourceLangEl.value;
+  const tgt = targetLangEl.value;
+  const langPair = src === 'auto' ? `${tgt}` : `${src}|${tgt}`;
+
+  const btn = document.getElementById('translateBtn');
+  btn.disabled = true;
+  document.getElementById('outputArea').classList.add('loading');
+  showStatus('Translating…', 'info', true);
+
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${src === 'auto' ? 'autodetect|' + tgt : src + '|' + tgt}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.responseStatus === 200) {
+      const translated = data.responseData.translatedText;
+      document.getElementById('outputText').value = translated;
+      document.getElementById('copyBtn').disabled = false;
+      document.getElementById('ttsOutputBtn').disabled = false;
+      showStatus(`✓ Translation complete`, 'success');
+      setTimeout(hideStatus, 3000);
+      addToHistory(text, translated, src === 'auto' ? 'auto' : src, tgt);
+    } else {
+      showStatus(`Translation failed: ${data.responseDetails || 'Unknown error'}`, 'error');
+    }
+  } catch (err) {
+    showStatus('Network error. Please check your internet connection.', 'error');
+  } finally {
+    btn.disabled = false;
+    document.getElementById('outputArea').classList.remove('loading');
+  }
+}
+
+// ── Language Detection ────────────────────────────────────────────────────────
+async function detectLanguage() {
+  const text = document.getElementById('inputText').value.trim();
+  if (!text) { showStatus('Enter some text to detect its language.', 'error'); return; }
+
+  showStatus('Detecting language…', 'info', true);
+  document.getElementById('detectBtn').disabled = true;
+
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 200))}&langpair=autodetect|en`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const detected = data.responseData?.detectedLanguage || null;
+
+    if (detected) {
+      const match = LANGUAGES.find(l => l.code === detected);
+      const name = match ? match.name : detected;
+      showStatus(`Detected: ${name} (${detected})`, 'success');
+      if ([...sourceLangEl.options].some(o => o.value === detected)) sourceLangEl.value = detected;
+      setTimeout(hideStatus, 4000);
+    } else {
+      showStatus('Could not detect language.', 'error');
+    }
+  } catch {
+    showStatus('Detection failed. Check your connection.', 'error');
+  } finally {
+    document.getElementById('detectBtn').disabled = false;
+  }
+}
+
+// ── Text-to-Speech ───────────────────────────────────────────────────────────
+function speakText(which) {
+  if (!window.speechSynthesis) { showStatus('TTS not supported in this browser.', 'error'); return; }
+  const text = which === 'input'
+    ? document.getElementById('inputText').value
+    : document.getElementById('outputText').value;
+  if (!text) return;
+
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  const lang = which === 'input' ? sourceLangEl.value : targetLangEl.value;
+  if (lang !== 'auto') utt.lang = lang;
+  window.speechSynthesis.speak(utt);
+}
+
+// ── History ───────────────────────────────────────────────────────────────────
+const history = [];
+
+function addToHistory(src, tgt, srcLang, tgtLang) {
+  history.unshift({ src, tgt, srcLang, tgtLang });
+  if (history.length > 8) history.pop();
+  renderHistory();
+}
+
+function renderHistory() {
+  const section = document.getElementById('historySection');
+  const list = document.getElementById('historyList');
+  if (history.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  list.innerHTML = history.map((item, i) => {
+    const srcName = LANGUAGES.find(l => l.code === item.srcLang)?.name || item.srcLang;
+    const tgtName = LANGUAGES.find(l => l.code === item.tgtLang)?.name || item.tgtLang;
+    return `
+      <div class="history-item" onclick="loadHistory(${i})">
+        <span class="lang-badge">${srcName}</span>
+        <span class="history-text">${item.src}</span>
+        <span class="arrow-icon">→</span>
+        <span class="history-text">${item.tgt}</span>
+      </div>`;
+  }).join('');
+}
+
+function loadHistory(i) {
+  const item = history[i];
+  document.getElementById('inputText').value = item.src;
+  document.getElementById('outputText').value = item.tgt;
+  if ([...sourceLangEl.options].some(o => o.value === item.srcLang)) sourceLangEl.value = item.srcLang;
+  if ([...targetLangEl.options].some(o => o.value === item.tgtLang)) targetLangEl.value = item.tgtLang;
+  updateCharCount();
+  document.getElementById('copyBtn').disabled = false;
+  document.getElementById('ttsOutputBtn').disabled = false;
+}
+
+// Enter key shortcut (Ctrl+Enter)
+document.getElementById('inputText').addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') doTranslate();
+});
+
+updateCharCount();
+
+// ── Theme Toggle ─────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  document.getElementById('themeIcon').textContent = isLight ? '☀️' : '🌙';
+  document.getElementById('themeLabel').textContent = isLight ? '/🌙 Theme' : '/☀ Theme';
+  localStorage.setItem('linguaflow-theme', isLight ? 'light' : 'dark');
+}
+
+// Restore saved theme
+if (localStorage.getItem('linguaflow-theme') === 'light') {
+  document.body.classList.add('light');
+  document.getElementById('themeIcon').textContent = '☀️';
+  document.getElementById('themeLabel').textContent = '/🌙 Theme';
+}
+</script>
+</body>
+</html>
